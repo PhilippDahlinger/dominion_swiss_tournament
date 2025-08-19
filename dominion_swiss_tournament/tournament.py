@@ -70,23 +70,19 @@ class Tournament:
 
         logging.info(f"Results uploaded for table {table} in round {self.current_round}.")
 
-
-    def close_round(self):
-        # check if all pairings have scores
+    def all_pairings_submitted(self):
         current_pairings = self.pairings[self.pairings["round"] == self.current_round]
-        if current_pairings["score1"].isnull().any() or current_pairings["score2"].isnull().any():
+        return not (current_pairings["score1"].isnull().any() or current_pairings["score2"].isnull().any())
+
+
+    def close_round(self) -> bool:
+        # check if all pairings have scores
+        if not self.all_pairings_submitted():
             logging.error("Not all pairings have scores. Cannot close round.")
-            return
-        # update player local pairings history
-        for player_id in self.players:
-            player = self.players[player_id]
-            player_pairings = current_pairings[
-                (current_pairings["player1"] == player_id) | (current_pairings["player2"] == player_id)]
-            if not player_pairings.empty:
-                player.pairings_history = pd.concat([player.pairings_history, player_pairings], ignore_index=True)
+            return False
         self.recompute_leaderboard()
-        # increment the round number
         logging.info(f"Round {self.current_round} closed.")
+        return True
 
     def recompute_leaderboard(self):
         self.leaderboard = {"player_id": [], "player_name": [], "score": []}

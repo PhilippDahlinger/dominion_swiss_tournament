@@ -5,7 +5,6 @@ class Player:
     def __init__(self, player_id, player_name):
         self.player_id = player_id
         self.player_name = player_name
-        self.pairings_history = pd.DataFrame(columns=["round", "table", "player1", "player2", "score1", "score2"])
 
     def score(self, all_pairings) -> float:
         """Total score accumulated across rounds."""
@@ -58,13 +57,3 @@ class Player:
     def __repr__(self):
         return self.player_name
 
-
-def get_player_pairings(player_id: int, all_pairings: pd.DataFrame) -> pd.DataFrame:
-    """
-    Get all pairings for a specific player.
-    :param player_id: ID of the player
-    :param all_pairings: DataFrame containing all pairings
-    :return: DataFrame with pairings for the player
-    """
-    mask = (all_pairings["player1"] == player_id) | (all_pairings["player2"] == player_id)
-    return all_pairings[mask].reset_index(drop=True)

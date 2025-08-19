@@ -180,7 +180,7 @@ class TournamentApp(tk.Tk):
         # Actions
         actions = ttk.Frame(outer)
         actions.pack(fill="x", pady=8)
-        self.submit_btn = ttk.Button(actions, text="Submit results & next round", command=self._submit_results_and_next_round)
+        self.submit_btn = ttk.Button(actions, text="Generate next round", command=self._generate_next_round, state="disabled")
         self.submit_btn.pack(side="right")
 
     def _clear_pairings_rows(self):
@@ -215,7 +215,7 @@ class TournamentApp(tk.Tk):
         self.round_label.config(text=f"Round {self.view_round}")
         self.prev_btn.configure(state=("normal" if self.view_round > 1 else "disabled"))
         self.next_btn.configure(state=("normal" if self.view_round < self.tournament.current_round else "disabled"))
-        self.submit_btn.configure(state=("normal" if self.view_round == self.tournament.current_round else "disabled"))
+        self.submit_btn.configure(state="disabled")
 
         self._build_pairings_header()
 
@@ -279,6 +279,12 @@ class TournamentApp(tk.Tk):
         # upload this value to the tournament database
         score1, score2 = RESULT_TO_SCORES[new_value]  # validate the result
         self.tournament.upload_result(table, score1, score2)
+        if self.tournament.all_pairings_submitted():
+            # enable the submit button
+            self.submit_btn.configure(state="normal")
+        else:
+            # disable the submit button
+            self.submit_btn.configure(state="disabled")
 
 
     def _goto_prev_round(self):
@@ -295,44 +301,30 @@ class TournamentApp(tk.Tk):
             self.view_round += 1
             self._populate_pairings_view()
 
-    def _submit_results_and_next_round(self):
+    def _generate_next_round(self):
         if self.tournament is None:
             return
         if self.view_round != self.tournament.current_round:
             messagebox.showinfo("Results", "You can only submit results on the current round.")
             return
-
-        # Validate all non-bye results are chosen (not N/A)
-        for row in self.result_widgets:
-            table = row["table"]
-            p2 = row["player2"]
-            sel = row["var"].get()
-
-            if table == -1 or p2 == -1:
-                # bye: already stored at generation time, skip
-                continue
-
-            if sel == "N/A":
-                messagebox.showerror("Missing results", f"Please enter a result for table {table}.")
+        # Close current round
+        if self.tournament.close_round():
+            # Generate next round (if possible)
+            try:
+                self.tournament.generate_new_round()
+            except Exception as e:
+                logging.error(e)
+                messagebox.showinfo("Tournament", "Next round could not be generated (maybe tournament is over).")
+                self._populate_leaderboard_view()
                 return
 
-        # Close current round
-        self.tournament.close_round()
-
-        # Generate next round (if possible)
-        try:
-            _ = self.tournament.generate_new_round()
-        except Exception as e:
-            logging.error(e)
-            messagebox.showinfo("Tournament", "Next round could not be generated (maybe tournament is over).")
+            # Update pairings & leaderboard views
+            self.view_round = self.tournament.current_round
+            self._populate_pairings_view()
             self._populate_leaderboard_view()
-            return
-
-        # Update pairings & leaderboard views
-        self.view_round = self.tournament.current_round
-        self._populate_pairings_view()
-        self._populate_leaderboard_view()
-        self.nb.select(self.pairings_tab)
+            self.nb.select(self.pairings_tab)
+        else:
+            messagebox.showinfo("Results", "Cannot close round: not all results are uploaded.")
 
     # ---------- Leaderboard tab ----------
     def _build_leaderboard_tab(self):
