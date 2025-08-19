@@ -192,7 +192,16 @@ class TournamentApp(tk.Tk):
         # Header row (in the same grid container as the rows)
         headers = [("Table", 0), ("Player 1", 1), ("Player 2", 2), ("Result", 3)]
         for text, col in headers:
-            ttk.Label(self.table_grid, text=text).grid(row=0, column=col, sticky="w", padx=(6 if col else 0, 6), pady=(0, 4))
+            ttk.Label(
+                self.table_grid,
+                text=text,
+                font=("TkDefaultFont", 10, "bold")  # 👈 bold font
+            ).grid(
+                row=0, column=col,
+                sticky="w",
+                padx=(6 if col else 0, 6),
+                pady=(0, 4)
+            )
 
     def _populate_pairings_view(self):
         self._clear_pairings_rows()
