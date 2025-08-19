@@ -29,16 +29,17 @@ class Tournament:
         self.current_round += 1
         if len(self.players) % 2 == 1:
             # one player has to receive a bye
-            bye_player_id = compute_bye_player(self.players)
+            bye_player_id = compute_bye_player(self.players, self.pairings)
             current_round_players = {key: value for key, value in self.players.items() if key != bye_player_id}
             # use -1 for a NaN player to keep the col as full integers, same for tables
-            new_row = {"player1": bye_player_id, "player2": -1, "score1": 1, "score2": 0, "round": self.current_round, "table": -1}
+            new_row = {"player1": bye_player_id, "player2": -1, "score1": 1, "score2": 0, "round": self.current_round,
+                       "table": -1}
             logging.info(f"Player {self.players[bye_player_id]} received a bye.")
         else:
             current_round_players = self.players
             new_row = None
-        G = build_player_graph(current_round_players)
-        pairings = compute_pairings(G, current_round_players)
+        G = build_player_graph(current_round_players, self.pairings)
+        pairings = compute_pairings(G, current_round_players, self.pairings)
         pairings = assign_tables(pairings, self.tables)
         # if bye player, add a pairing line that this player plays against a NaN player
         if new_row is not None:
@@ -47,7 +48,7 @@ class Tournament:
         pairings["round"] = self.current_round
         self.pairings = pd.concat([self.pairings, pairings], ignore_index=True)
         logging.info(f"Created new round with {len(pairings)} pairings.")
-        return pairings # return new pairings
+        return pairings  # return new pairings
 
     def upload_result(self, table, score1, score2):
         # boolean mask for the match
@@ -68,6 +69,8 @@ class Tournament:
         self.pairings.loc[idx, "score2"] = score2
 
         logging.info(f"Results uploaded for table {table} in round {self.current_round}.")
+
+
     def close_round(self):
         # check if all pairings have scores
         current_pairings = self.pairings[self.pairings["round"] == self.current_round]
@@ -90,11 +93,10 @@ class Tournament:
         for player_id, player in self.players.items():
             self.leaderboard["player_id"].append(player_id)
             self.leaderboard["player_name"].append(player.player_name)
-            self.leaderboard["score"].append(player.score)
+            self.leaderboard["score"].append(player.score(self.pairings))
         self.leaderboard = pd.DataFrame(self.leaderboard)
         # sort descending of score
         self.leaderboard = self.leaderboard.sort_values("score", ascending=False, inplace=False).reset_index(drop=True)
         # add rank column starting with 1
         self.leaderboard["rank"] = self.leaderboard.index + 1
         logging.info("Recomputed leaderboard.")
-

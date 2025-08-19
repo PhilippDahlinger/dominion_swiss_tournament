@@ -1,4 +1,5 @@
 # gui.py
+import functools
 import logging
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -18,7 +19,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 RESULT_OPTIONS = ["N/A", "1-0", "0.5-0.5", "0-1"]
-RESULT_TO_SCORES = {"1-0": (1.0, 0.0), "0.5-0.5": (0.5, 0.5), "0-1": (0.0, 1.0)}
+RESULT_TO_SCORES = {"1-0": (1.0, 0.0), "0.5-0.5": (0.5, 0.5), "0-1": (0.0, 1.0), "N/A": (np.nan, np.nan)}
 
 
 def _scores_to_result(score1, score2):
@@ -208,34 +209,25 @@ class TournamentApp(tk.Tk):
         if self.tournament is None:
             return
 
-        # default to current round if not set
         if self.view_round is None:
             self.view_round = self.tournament.current_round
 
-        # Header text
         self.round_label.config(text=f"Round {self.view_round}")
-
-        # Enable/disable nav buttons
         self.prev_btn.configure(state=("normal" if self.view_round > 1 else "disabled"))
         self.next_btn.configure(state=("normal" if self.view_round < self.tournament.current_round else "disabled"))
-
-        # Submit only on current round
         self.submit_btn.configure(state=("normal" if self.view_round == self.tournament.current_round else "disabled"))
 
-        # Build header
         self._build_pairings_header()
 
         df = self.tournament.pairings[self.tournament.pairings["round"] == self.view_round].copy()
         if df.empty:
             return
 
-        # keep byes (-1) at bottom; stable sort
         df['__bye__'] = (df['table'] == -1).astype(int)
         df = df.sort_values(['__bye__', 'table']).drop(columns='__bye__')
 
         viewing_current = (self.view_round == self.tournament.current_round)
 
-        # Data rows start at row=1 (row=0 is header)
         for r, (_, row) in enumerate(df.iterrows(), start=1):
             table = int(row["table"])
             p1 = int(row["player1"])
@@ -247,21 +239,29 @@ class TournamentApp(tk.Tk):
                     return "BYE"
                 return self.tournament.players.get(pid, Player(pid, f"#{pid}")).player_name
 
-            ttk.Label(self.table_grid, text=("—" if table == -1 else str(table))).grid(row=r, column=0, sticky="w", padx=(0, 6))
+            ttk.Label(self.table_grid, text=("—" if table == -1 else str(table))).grid(row=r, column=0, sticky="w",
+                                                                                       padx=(0, 6))
             ttk.Label(self.table_grid, text=name_for(p1)).grid(row=r, column=1, sticky="w", padx=6)
             ttk.Label(self.table_grid, text=name_for(p2)).grid(row=r, column=2, sticky="w", padx=6)
 
             initial = _scores_to_result(s1, s2)
             cb_var = tk.StringVar(value=initial if initial in RESULT_OPTIONS else "N/A")
-            cb = ttk.Combobox(self.table_grid, values=RESULT_OPTIONS, textvariable=cb_var, state="readonly", width=10)
+            cb = ttk.Combobox(
+                self.table_grid,
+                values=RESULT_OPTIONS,
+                textvariable=cb_var,
+                state="readonly",
+                width=10
+            )
             cb.grid(row=r, column=3, sticky="w", padx=6)
 
-            # Disable result editing for:
-            # - bye rows
-            # - any round that is not the current round
             disable = (table == -1 or p2 == -1 or not viewing_current)
             if disable:
                 cb.configure(state="disabled")
+
+            # Bind callback — use functools.partial to pass row context
+            cb.bind("<<ComboboxSelected>>",
+                    functools.partial(self._on_result_changed, row_index=r, table=table, p1=p1, p2=p2))
 
             self.result_widgets.append({
                 "round": self.view_round,
@@ -271,6 +271,15 @@ class TournamentApp(tk.Tk):
                 "combobox": cb,
                 "var": cb_var,
             })
+
+    def _on_result_changed(self, event, row_index, table, p1, p2):
+        """Callback when a combobox result is changed. Upsert the tournament data."""
+        cb = event.widget
+        new_value = cb.get()
+        # upload this value to the tournament database
+        score1, score2 = RESULT_TO_SCORES[new_value]  # validate the result
+        self.tournament.upload_result(table, score1, score2)
+
 
     def _goto_prev_round(self):
         if not self.tournament or self.view_round is None:
@@ -294,7 +303,6 @@ class TournamentApp(tk.Tk):
             return
 
         # Validate all non-bye results are chosen (not N/A)
-        to_upload = []
         for row in self.result_widgets:
             table = row["table"]
             p2 = row["player2"]
@@ -308,14 +316,7 @@ class TournamentApp(tk.Tk):
                 messagebox.showerror("Missing results", f"Please enter a result for table {table}.")
                 return
 
-            scores = RESULT_TO_SCORES[sel]
-            to_upload.append((table, scores[0], scores[1]))
-
-        # Upload results to Tournament
-        for (table, s1, s2) in to_upload:
-            self.tournament.upload_result(table=table, score1=s1, score2=s2)
-
-        # Close current round (will also update player histories and leaderboard)
+        # Close current round
         self.tournament.close_round()
 
         # Generate next round (if possible)
@@ -362,6 +363,7 @@ class TournamentApp(tk.Tk):
             return
 
         # Use the leaderboard as provided by Tournament (no recomputation here)
+        self.tournament.recompute_leaderboard()
         lb = self.tournament.leaderboard
 
         # Expect columns: player_id, player_name, score, rank
