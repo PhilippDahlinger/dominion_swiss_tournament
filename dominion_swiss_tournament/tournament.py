@@ -26,13 +26,12 @@ class Tournament:
         logging.info(f"Added {len(players)} players to the tournament.")
 
     def generate_new_round(self) -> pd.DataFrame:
-        self.current_round += 1
         if len(self.players) % 2 == 1:
             # one player has to receive a bye
             bye_player_id = compute_bye_player(self.players, self.pairings)
             current_round_players = {key: value for key, value in self.players.items() if key != bye_player_id}
             # use -1 for a NaN player to keep the col as full integers, same for tables
-            new_row = {"player1": bye_player_id, "player2": -1, "score1": 1, "score2": 0, "round": self.current_round,
+            new_row = {"player1": bye_player_id, "player2": -1, "score1": 1, "score2": 0, "round": self.current_round + 1,
                        "table": -1}
             logging.info(f"Player {self.players[bye_player_id]} received a bye.")
         else:
@@ -45,8 +44,10 @@ class Tournament:
         if new_row is not None:
             pairings = pd.concat([pairings, pd.DataFrame([new_row])], ignore_index=True)
         # add round number and table to pairings
-        pairings["round"] = self.current_round
+        pairings["round"] = self.current_round + 1
         self.pairings = pd.concat([self.pairings, pairings], ignore_index=True)
+        # update round
+        self.current_round += 1
         logging.info(f"Created new round with {len(pairings)} pairings.")
         return pairings  # return new pairings
 

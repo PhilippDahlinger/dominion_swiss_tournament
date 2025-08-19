@@ -117,7 +117,7 @@ class TournamentApp(tk.Tk):
     def _start_tournament(self):
         players_raw = self.players_text.get("1.0", "end").strip()
         if not players_raw:
-            messagebox.showerror("Validation", "Please enter at least one player.")
+            messagebox.showerror("Validation", "Please enter at least two players.")
             return
 
         players = [p.strip() for p in players_raw.splitlines() if p.strip()]
