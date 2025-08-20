@@ -39,7 +39,7 @@ class Tournament:
             new_row = None
         G = build_player_graph(current_round_players, self.pairings)
         pairings = compute_pairings(G, current_round_players, self.pairings)
-        pairings = assign_tables(pairings, self.tables)
+        pairings = assign_tables(pairings, self.players, self.pairings, self.tables)
         # if bye player, add a pairing line that this player plays against a NaN player
         if new_row is not None:
             pairings = pd.concat([pairings, pd.DataFrame([new_row])], ignore_index=True)

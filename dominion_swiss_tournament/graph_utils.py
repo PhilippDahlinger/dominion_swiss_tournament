@@ -74,9 +74,30 @@ def compute_edge_weight(player1: Player, player2: Player, pairings) -> float:
     return score_weight * 10000 + color_weight * 100 + pi_weight
 
 
-def assign_tables(pairings: pd.DataFrame, tables: list[int]) -> pd.DataFrame:
+def assign_tables(pairings: pd.DataFrame, players, all_pairings, tables: list[int]) -> pd.DataFrame:
     # assign tables to pairings randomly
-    pairings["table"] = np.random.choice(tables, size=len(pairings), replace=False)
+    G = nx.Graph()
+    G.add_nodes_from(tables)
+    pairs = list(zip(pairings["player1"].astype(int), pairings["player2"].astype(int)))
+    G.add_nodes_from(pairs)
+    for pair in pairs:
+        # add an edge between the pair and all tables on which they have not played yet
+        tables_1 = players[pair[0]].past_tables(all_pairings)
+        tables_2 = players[pair[1]].past_tables(all_pairings)
+        free_opponents = set(tables) - set(tables_1) - set(tables_2)
+        for table in free_opponents:
+            G.add_edge(pair, table, weight=1)
+    matching = nx.max_weight_matching(G)
+    matching = [(u, v) for u, v in matching]
+    # ensure that the matching is perfect
+    assert len(matching) == len(pairs)
+    # ensure that the tuple is (pair, table)
+    for i in range(len(matching)):
+        if isinstance(matching[i][1], tuple):
+            matching[i] = (matching[i][1], matching[i][0])
+    for pair, table in matching:
+        pairings.loc[(pairings["player1"] == pair[0]) & (pairings["player2"] == pair[1]), "table"] = table
+
     return pairings
 
 

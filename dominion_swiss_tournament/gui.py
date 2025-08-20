@@ -10,9 +10,6 @@ import sv_ttk
 
 # Adjust these imports to match your project structure
 from dominion_swiss_tournament.player import Player
-from dominion_swiss_tournament.graph_utils import (
-    build_player_graph, compute_pairings, assign_tables, compute_bye_player
-)
 from dominion_swiss_tournament.tournament import Tournament
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
