@@ -1,3 +1,4 @@
+import logging
 import random
 
 import networkx as nx
@@ -46,7 +47,7 @@ def compute_pairings(G: nx.Graph, players, all_pairings) -> pd.DataFrame:
     matching = nx.max_weight_matching(G)
     # convert the matching to a list of tuples
     matching = [(u, v) for u, v in matching]
-    assert 2 * len(matching) == len(players)
+    assert 2 * len(matching) == len(players), "Impossible to generate pairings with given players and previous pairings."
     # created pandas dataframe
     pairings = pd.DataFrame(matching, columns=["player1", "player2"])
     # the first player should be the one with the smaller color_difference (-> less played with white)
@@ -90,13 +91,27 @@ def assign_tables(pairings: pd.DataFrame, players, all_pairings, tables: list[in
     matching = nx.max_weight_matching(G)
     matching = [(u, v) for u, v in matching]
     # ensure that the matching is perfect
-    assert len(matching) == len(pairs)
+
     # ensure that the tuple is (pair, table)
     for i in range(len(matching)):
         if isinstance(matching[i][1], tuple):
             matching[i] = (matching[i][1], matching[i][0])
+    assigned_paris = []
+    assigned_tables = []
     for pair, table in matching:
         pairings.loc[(pairings["player1"] == pair[0]) & (pairings["player2"] == pair[1]), "table"] = table
+        assigned_paris.append(pair)  # keep track which pair already got a table
+        assigned_tables.append(table)  # keep track which table was assigned
+    missing_pairs = set(pairs) - set(assigned_paris)
+    free_tables = list(set(tables) - set(assigned_tables))
+    if len(missing_pairs) > 0:
+        logging.warning("Not all pairings could be assigned to a new table. Assign randomly for problematic pairings.")
+        for pair in missing_pairs:
+            # select random free table
+            random_table = random.choice(free_tables)
+            free_tables.remove(random_table)
+            pairings.loc[(pairings["player1"] == pair[0]) & (pairings["player2"] == pair[1]), "table"] = random_table
+
 
     return pairings
 

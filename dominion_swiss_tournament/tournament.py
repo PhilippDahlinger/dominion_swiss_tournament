@@ -18,12 +18,16 @@ class Tournament:
         self.recompute_leaderboard()
 
     def add_players(self, players: list[str]):
+        # check that there are enough tables
+        if len(self.tables) < (len(players) + len(self.players)) // 2:
+            raise ValueError(f"Not enough tables for this amount of players: {len(self.tables)} tables for {(len(players) + len(self.players))} players")
         for player in players:
             # generate a unique player ID
             player_id = len(self.players) + 1
             player_obj = Player(player_id, player)
             self.players[player_id] = player_obj
         logging.info(f"Added {len(players)} players to the tournament.")
+
 
     def generate_new_round(self) -> pd.DataFrame:
         if len(self.players) % 2 == 1:

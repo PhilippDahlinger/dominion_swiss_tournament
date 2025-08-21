@@ -129,7 +129,12 @@ class TournamentApp(tk.Tk):
 
         # create Tournament and first round
         self.tournament = Tournament(num_tables=num_tables)
-        self.tournament.add_players(players)
+        try:
+            self.tournament.add_players(players)
+        except ValueError:
+            messagebox.showerror("Setup Error", "Not enough tables for the number of players.")
+            self.tournament = None
+            return
 
         # Generate round 1
         _ = self.tournament.generate_new_round()
