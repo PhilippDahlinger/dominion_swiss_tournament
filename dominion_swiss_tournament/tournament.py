@@ -90,14 +90,22 @@ class Tournament:
         return True
 
     def recompute_leaderboard(self):
-        self.leaderboard = {"player_id": [], "player_name": [], "score": []}
+        self.leaderboard = {"player_id": [], "player_name": [], "score": [], "buchholz_score": []}
         for player_id, player in self.players.items():
             self.leaderboard["player_id"].append(player_id)
             self.leaderboard["player_name"].append(player.player_name)
             self.leaderboard["score"].append(player.score(self.pairings))
+            self.leaderboard["buchholz_score"].append(player.buchholz_score(self.pairings, self.players, median=False))
         self.leaderboard = pd.DataFrame(self.leaderboard)
         # sort descending of score
-        self.leaderboard = self.leaderboard.sort_values("score", ascending=False, inplace=False).reset_index(drop=True)
-        # add rank column starting with 1
+        self.leaderboard = (
+            self.leaderboard
+            .sort_values(
+                by=["score", "buchholz_score"],
+                ascending=[False, False],  # both descending
+                inplace=False
+            )
+            .reset_index(drop=True)
+        )        # add rank column starting with 1
         self.leaderboard["rank"] = self.leaderboard.index + 1
         logging.info("Recomputed leaderboard.")

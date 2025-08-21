@@ -17,10 +17,39 @@ class Player:
 
         return float(score_as_p1 + score_as_p2)
 
+    def buchholz_score(self, all_pairings, all_players, median=True):
+        """
+        Computes the sum of socres of all opponents played Used as a tiebreaker
+        :param all_pairings:
+        :param all_players:
+        :param median If true, discard the best and the worst opponent from the computation
+        :return:
+        """
+        opponents = self.past_opponents(all_pairings)
+        if not opponents:
+            return 0.0
+        opponents_score = []
+        for opp in opponents:
+            opp_score = all_players[opp].score(all_pairings)
+            if all_players[opp].received_bye(all_pairings):
+                # if opponent received a bye, their score for buchholz is 0.5 lower (bye counts 0.5 for buchholz, but 1.0 for score)
+                opp_score -= 0.5
+            opponents_score.append(opp_score)
+
+        if median and len(opponents_score) > 2:
+            # discard the best and the worst opponent
+            opponents_score = sorted(opponents_score)
+            opponents_score = opponents_score[1:-1]  # remove first and last element
+
+        return sum(opponents_score)
+
     def past_opponents(self, all_pairings) -> list:
         """List of all opponents played so far."""
         opponents = []
         for _, row in all_pairings.iterrows():
+            # ignore rows which have NaN as a score
+            if pd.isna(row["score1"]) or pd.isna(row["score2"]):
+                continue
             # filter out Nan opponents (resulting from byes)
             if row["player1"] == self.player_id and row["player2"] != -1:
                 opponents.append(row["player2"])

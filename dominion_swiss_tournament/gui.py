@@ -336,10 +336,10 @@ class TournamentApp(tk.Tk):
         header = ttk.Label(outer, text="Leaderboard (current)", font=("TkDefaultFont", 14, "bold"))
         header.pack(anchor="w", pady=(0, 8))
 
-        cols = ("rank", "player_name", "score")
-        self.leader_tv = ttk.Treeview(outer, columns=cols, show="headings", height=20)
-        for c in cols:
-            self.leader_tv.heading(c, text=c.title())
+        cols = {"rank": "Rank", "player_name": "Player", "score": "Score", "buchholz_score": "Tiebreak Score"}
+        self.leader_tv = ttk.Treeview(outer, columns=list(cols.keys()), show="headings", height=20)
+        for c, display_name in cols.items():
+            self.leader_tv.heading(c, text=display_name)
             self.leader_tv.column(c, width=150 if c != "player_name" else 300, anchor="center")
         self.leader_tv.pack(fill="both", expand=True)
 
@@ -360,9 +360,9 @@ class TournamentApp(tk.Tk):
         self.tournament.recompute_leaderboard()
         lb = self.tournament.leaderboard
 
-        # Expect columns: player_id, player_name, score, rank
+        # Expect columns: player_id, player_name, score, buchholz_score, rank
         for _, r in lb.iterrows():
-            self.leader_tv.insert("", "end", values=(int(r["rank"]), r["player_name"], float(r["score"])))
+            self.leader_tv.insert("", "end", values=(int(r["rank"]), r["player_name"], float(r["score"]), float(r["buchholz_score"])))
 
     # ---------- Tab switch handling ----------
     def _on_tab_changed(self, event):
