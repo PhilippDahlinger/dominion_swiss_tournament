@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+from math import comb
 
 from dominion_swiss_tournament.graph_utils import build_player_graph, compute_pairings, assign_tables, \
     compute_bye_player
@@ -90,22 +91,131 @@ class Tournament:
         return True
 
     def recompute_leaderboard(self):
-        self.leaderboard = {"player_id": [], "player_name": [], "score": [], "buchholz_score": []}
+        def add_direct_encounter_score(leaderboard: pd.DataFrame, pairings: pd.DataFrame) -> pd.DataFrame:
+            """
+            Adds 'direct_encounter_score' to the leaderboard.
+
+            For each tie group (same score, buchholz_score_cut1, buchholz_score):
+              - Check if the players in that group all played each other exactly once.
+                (i.e., number of games among group members == nC2)
+              - If yes: compute each player's sum of points from only those intra-group games.
+              - If not: set 0 for everyone in that group.
+            """
+            # Ensure we don't mutate the original
+            lb = leaderboard.copy()
+            lb["direct_encounter_score"] = 0.0
+
+            # Helper to compute per-group direct-encounter scores
+            def compute_group(df_group: pd.DataFrame) -> pd.Series:
+                player_ids = set(df_group["player_id"].tolist())
+                n = len(player_ids)
+                if n < 2:
+                    return pd.Series(0.0, index=df_group.index)
+
+                # Games strictly within the group
+                intra = pairings[
+                    (pairings["player1"].isin(player_ids)) & (pairings["player2"].isin(player_ids)) & (~pairings["score1"].isnull())
+                    ].copy()
+
+                expected_games = comb(n, 2)
+                if len(intra) != expected_games:
+                    return pd.Series(0.0, index=df_group.index)
+
+                # Long scores
+                a = intra.rename(columns={"player1": "player_id", "score1": "score"})[["player_id", "score"]]
+                b = intra.rename(columns={"player2": "player_id", "score2": "score"})[["player_id", "score"]]
+                long_scores = pd.concat([a, b], ignore_index=True)
+
+                sums = long_scores.groupby("player_id")["score"].sum()
+
+                return df_group["player_id"].map(sums).fillna(0.0)
+
+            if sum(~pairings["score1"].isnull()) == 0:
+                # no matches played yet, return empty leaderboard
+                return lb
+            # Apply per tie-group
+            group_cols = ["score", "buchholz_score_cut1", "buchholz_score"]
+            lb["direct_encounter_score"] = (
+                lb.groupby(group_cols, group_keys=False)
+                .apply(compute_group, include_groups=False)
+            )
+
+            return lb
+
+        def add_number_of_wins(leaderboard: pd.DataFrame, pairings: pd.DataFrame) -> pd.DataFrame:
+            """
+            Adds 'number_of_wins' to the leaderboard:
+              - A win is defined as score == 1.
+            """
+            # Long format of all results
+            a = pairings.rename(columns={"player1": "player_id", "score1": "score"})[["player_id", "score"]]
+            b = pairings.rename(columns={"player2": "player_id", "score2": "score"})[["player_id", "score"]]
+            long_scores = pd.concat([a, b], ignore_index=True)
+
+            # Count wins per player
+            wins = (long_scores["score"] == 1).groupby(long_scores["player_id"]).sum()
+
+            # Map into leaderboard
+            leaderboard = leaderboard.copy()
+            leaderboard["number_of_wins"] = leaderboard["player_id"].map(wins).fillna(0).astype(int)
+
+            return leaderboard
+
+        def add_number_of_wins_as_player2(leaderboard: pd.DataFrame, pairings: pd.DataFrame) -> pd.DataFrame:
+            """
+            Adds 'number_of_wins_as_player2' to the leaderboard:
+              - A win is defined as score2 == 1 (only when the player was player2).
+            """
+            # Take only player2 side
+            p2 = pairings.rename(columns={"player2": "player_id", "score2": "score"})[["player_id", "score"]]
+
+            # Count wins as player2
+            wins_p2 = (p2["score"] == 1).groupby(p2["player_id"]).sum()
+
+            # Map into leaderboard
+            leaderboard = leaderboard.copy()
+            leaderboard["number_of_wins_as_player2"] = leaderboard["player_id"].map(wins_p2).fillna(0).astype(int)
+
+            return leaderboard
+
+        def add_number_of_games_as_player2(leaderboard: pd.DataFrame, pairings: pd.DataFrame) -> pd.DataFrame:
+            """
+            Adds 'number_of_games_as_player2' to the leaderboard:
+              - Counts every game where the player was in the player2 column.
+            """
+            # Count appearances as player2
+            games_p2 = pairings["player2"].value_counts()
+
+            # Map into leaderboard
+            leaderboard = leaderboard.copy()
+            leaderboard["number_of_games_as_player2"] = leaderboard["player_id"].map(games_p2).fillna(0).astype(int)
+
+            return leaderboard
+
+        self.leaderboard = {"player_id": [], "player_name": [], "score": [], "buchholz_score_cut1": [], "buchholz_score": []}
         for player_id, player in self.players.items():
             self.leaderboard["player_id"].append(player_id)
             self.leaderboard["player_name"].append(player.player_name)
             self.leaderboard["score"].append(player.score(self.pairings))
-            self.leaderboard["buchholz_score"].append(player.buchholz_score(self.pairings, self.players, median=False))
+            self.leaderboard["buchholz_score"].append(player.buchholz_score(self.pairings, self.players, mode="normal"))
+            self.leaderboard["buchholz_score_cut1"].append(player.buchholz_score(self.pairings, self.players, mode="cut1"))
         self.leaderboard = pd.DataFrame(self.leaderboard)
+        # get direct encounters:
+        self.leaderboard = add_direct_encounter_score(self.leaderboard, self.pairings)
+        self.leaderboard = add_number_of_wins(self.leaderboard, self.pairings)
+        self.leaderboard = add_number_of_wins_as_player2(self.leaderboard, self.pairings)
+        self.leaderboard = add_number_of_games_as_player2(self.leaderboard, self.pairings)
+
         # sort descending of score
         self.leaderboard = (
             self.leaderboard
             .sort_values(
-                by=["score", "buchholz_score"],
-                ascending=[False, False],  # both descending
+                by=["score", "buchholz_score_cut1", "buchholz_score", "direct_encounter_score", "number_of_wins", "number_of_wins_as_player2", "number_of_games_as_player2"],
+                ascending=[False] * 7,  # all descending
                 inplace=False
             )
             .reset_index(drop=True)
         )        # add rank column starting with 1
         self.leaderboard["rank"] = self.leaderboard.index + 1
         logging.info("Recomputed leaderboard.")
+        logging.debug(self.leaderboard.to_string())

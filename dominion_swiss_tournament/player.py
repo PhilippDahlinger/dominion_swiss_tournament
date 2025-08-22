@@ -17,12 +17,12 @@ class Player:
 
         return float(score_as_p1 + score_as_p2)
 
-    def buchholz_score(self, all_pairings, all_players, median=True):
+    def buchholz_score(self, all_pairings, all_players, mode="normal"):
         """
         Computes the sum of socres of all opponents played Used as a tiebreaker
         :param all_pairings:
         :param all_players:
-        :param median If true, discard the best and the worst opponent from the computation
+        :param mode: normal, median, cut1
         :return:
         """
         opponents = self.past_opponents(all_pairings)
@@ -36,10 +36,14 @@ class Player:
                 opp_score -= 0.5
             opponents_score.append(opp_score)
 
-        if median and len(opponents_score) > 2:
+        if mode == "median" and len(opponents_score) > 2:
             # discard the best and the worst opponent
             opponents_score = sorted(opponents_score)
             opponents_score = opponents_score[1:-1]  # remove first and last element
+        elif mode == "cut1" and len(opponents_score) > 1:
+            # discard the worst opponent
+            opponents_score = sorted(opponents_score)
+            opponents_score = opponents_score[1:]
 
         return sum(opponents_score)
 

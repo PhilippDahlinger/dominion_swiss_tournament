@@ -12,7 +12,7 @@ import sv_ttk
 from dominion_swiss_tournament.player import Player
 from dominion_swiss_tournament.tournament import Tournament
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 
 
 RESULT_OPTIONS = ["N/A", "1-0", "0.5-0.5", "0-1"]
@@ -336,7 +336,7 @@ class TournamentApp(tk.Tk):
         header = ttk.Label(outer, text="Leaderboard (current)", font=("TkDefaultFont", 14, "bold"))
         header.pack(anchor="w", pady=(0, 8))
 
-        cols = {"rank": "Rank", "player_name": "Player", "score": "Score", "buchholz_score": "Tiebreak Score"}
+        cols = {"rank": "Rank", "player_name": "Player", "score": "Score"}
         self.leader_tv = ttk.Treeview(outer, columns=list(cols.keys()), show="headings", height=20)
         for c, display_name in cols.items():
             self.leader_tv.heading(c, text=display_name)
@@ -362,7 +362,7 @@ class TournamentApp(tk.Tk):
 
         # Expect columns: player_id, player_name, score, buchholz_score, rank
         for _, r in lb.iterrows():
-            self.leader_tv.insert("", "end", values=(int(r["rank"]), r["player_name"], float(r["score"]), float(r["buchholz_score"])))
+            self.leader_tv.insert("", "end", values=(int(r["rank"]), r["player_name"], float(r["score"])))
 
     # ---------- Tab switch handling ----------
     def _on_tab_changed(self, event):
