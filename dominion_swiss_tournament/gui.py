@@ -14,7 +14,6 @@ from dominion_swiss_tournament.tournament import Tournament
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 
-
 RESULT_OPTIONS = ["N/A", "1-0", "0.5-0.5", "0-1"]
 RESULT_TO_SCORES = {"1-0": (1.0, 0.0), "0.5-0.5": (0.5, 0.5), "0-1": (0.0, 1.0), "N/A": (np.nan, np.nan)}
 
@@ -35,6 +34,7 @@ def _scores_to_result(score1, score2):
 
 class ScrollableFrame(ttk.Frame):
     """A vertically scrollable frame (for the pairings table)."""
+
     def __init__(self, parent, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
         self.canvas = tk.Canvas(self, highlightthickness=0)
@@ -63,8 +63,8 @@ class TournamentApp(tk.Tk):
 
         # state
         self.tournament: Tournament | None = None
-        self.result_widgets = []                 # per pairing row widgets (metadata)
-        self.view_round: int | None = None       # Pairings view round
+        self.result_widgets = []  # per pairing row widgets (metadata)
+        self.view_round: int | None = None  # Pairings view round
 
         # notebook with 3 tabs (views)
         self.nb = ttk.Notebook(self)
@@ -86,31 +86,6 @@ class TournamentApp(tk.Tk):
         self._build_leaderboard_tab()
 
     # ---------- Setup tab ----------
-    def _build_setup_tab(self):
-        wrapper = ttk.Frame(self.setup_tab, padding=16)
-        wrapper.pack(fill="both", expand=True)
-
-        header = ttk.Label(wrapper, text="Setup Tournament", font=("TkDefaultFont", 16, "bold"))
-        header.pack(anchor="w", pady=(0, 12))
-
-        form = ttk.Frame(wrapper)
-        form.pack(fill="x", pady=8)
-
-        # Number of tables
-        ttk.Label(form, text="Number of tables:").grid(row=0, column=0, sticky="w", padx=(0, 8))
-        self.tables_var = tk.IntVar(value=8)
-        self.tables_spin = ttk.Spinbox(form, from_=1, to=200, textvariable=self.tables_var, width=8)
-        self.tables_spin.grid(row=0, column=1, sticky="w")
-
-        # Players input
-        ttk.Label(wrapper, text="Players (one per line):").pack(anchor="w", pady=(12, 4))
-        self.players_text = tk.Text(wrapper, height=16)
-        self.players_text.pack(fill="both", expand=True)
-
-        # Start button
-        start_btn = ttk.Button(wrapper, text="Start Tournament", command=self._start_tournament)
-        start_btn.pack(anchor="e", pady=12)
-
     def _start_tournament(self):
         players_raw = self.players_text.get("1.0", "end").strip()
         if not players_raw:
@@ -147,6 +122,138 @@ class TournamentApp(tk.Tk):
         # switch to pairings tab
         self.nb.select(self.pairings_tab)
 
+    def _build_setup_tab(self):
+        wrapper = ttk.Frame(self.setup_tab, padding=16)
+        wrapper.pack(fill="both", expand=True)
+
+        header = ttk.Label(wrapper, text="Setup Tournament", font=("TkDefaultFont", 16, "bold"))
+        header.pack(anchor="w", pady=(0, 12))
+
+        form = ttk.Frame(wrapper)
+        form.pack(fill="x", pady=8)
+
+        # Tournament name
+        ttk.Label(form, text="Tournament name:").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.tournament_name_var = tk.StringVar()
+        self.tournament_name_entry = ttk.Entry(form, textvariable=self.tournament_name_var, width=32)
+        self.tournament_name_entry.grid(row=0, column=1, sticky="we", columnspan=2)
+
+        # Number of tables
+        ttk.Label(form, text="Number of tables:").grid(row=1, column=0, sticky="w", padx=(0, 8))
+        self.tables_var = tk.IntVar(value=8)
+        self.tables_spin = ttk.Spinbox(form, from_=1, to=200, textvariable=self.tables_var, width=8)
+        self.tables_spin.grid(row=1, column=1, sticky="w")
+
+        form.columnconfigure(1, weight=1)
+
+        # Players input
+        ttk.Label(wrapper, text="Players (one per line):").pack(anchor="w", pady=(12, 4))
+        self.players_text = tk.Text(wrapper, height=16)
+        self.players_text.pack(fill="both", expand=True)
+
+        # Footer with left + right buttons
+        footer = ttk.Frame(wrapper)
+        footer.pack(fill="x", pady=12)
+
+        # Left: Load Tournament
+        load_btn = ttk.Button(footer, text="Load Tournament", command=self._open_load_dialog)
+        load_btn.pack(side="left")  # bottom-left
+
+        # Right: Start Tournament
+        start_btn = ttk.Button(footer, text="Start Tournament", command=self._start_tournament)
+        start_btn.pack(side="right")  # bottom-right
+
+    def _open_load_dialog(self):
+        # parent window
+        parent = self.winfo_toplevel()
+
+        dlg = tk.Toplevel(parent)
+        dlg.title("Load Tournament")
+        dlg.transient(parent)
+        dlg.grab_set()  # modal
+        dlg.resizable(False, False)
+
+        # Content
+        frm = ttk.Frame(dlg, padding=12)
+        frm.pack(fill="both", expand=True)
+
+        ttk.Label(frm, text="Select a tournament:").pack(anchor="w", pady=(0, 8))
+
+        # Listbox with scrollbar
+        listframe = ttk.Frame(frm)
+        listframe.pack(fill="both", expand=True)
+
+        scrollbar = ttk.Scrollbar(listframe, orient="vertical")
+        lb = tk.Listbox(listframe, height=10, activestyle="dotbox",
+                        exportselection=False)  # keep selection when focus changes
+        lb.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        lb.configure(yscrollcommand=scrollbar.set)
+        scrollbar.configure(command=lb.yview)
+
+        # Populate
+        names = self._get_saved_tournament_names()
+        for name in names:
+            lb.insert("end", name)
+
+        # Buttons
+        btns = ttk.Frame(frm)
+        btns.pack(fill="x", pady=(10, 0))
+
+        def on_ok(event=None):
+            sel = lb.curselection()
+            if not sel:
+                messagebox.showinfo("No selection", "Please select a tournament.")
+                return
+            name = lb.get(sel[0])
+            try:
+                self._on_tournament_selected(name)  # <-- your callback with the selected string
+            finally:
+                dlg.destroy()
+
+        def on_cancel(event=None):
+            dlg.destroy()
+
+        ok_btn = ttk.Button(btns, text="OK", command=on_ok)
+        cancel_btn = ttk.Button(btns, text="Cancel", command=on_cancel)
+        cancel_btn.pack(side="right", padx=(8, 0))
+        ok_btn.pack(side="right")
+
+        # UX niceties
+        lb.bind("<Double-1>", on_ok)  # double-click to confirm
+        dlg.bind("<Return>", on_ok)  # Enter triggers OK
+        dlg.bind("<Escape>", on_cancel)  # Esc cancels
+
+        # Optional: preselect first item
+        if names:
+            lb.selection_set(0)
+            lb.see(0)
+
+        # Center over parent
+        dlg.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (dlg.winfo_width() // 2)
+        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (dlg.winfo_height() // 2)
+        dlg.geometry(f"+{max(0, x)}+{max(0, y)}")
+
+        dlg.wait_window()  # block until closed
+
+    def _get_saved_tournament_names(self):
+        """
+        Replace this with your real storage (e.g., scan a directory, read a DB, etc.)
+        Must return a list[str].
+        """
+        return ["Spring Open 2024", "City Cup", "Friday Night #12", "Test Event"]
+
+    def _on_tournament_selected(self, name: str):
+        """
+        This gets the SELECTED STRING from the dialog.
+        Do your loading logic here.
+        """
+        print("Selected tournament:", name)
+        # example: set the name field and load data
+        self.tournament_name_var.set(name)
+        # self._load_tournament_from_disk(name)
+
     # ---------- Pairings tab ----------
     def _build_pairings_tab(self):
         outer = ttk.Frame(self.pairings_tab, padding=12)
@@ -182,7 +289,8 @@ class TournamentApp(tk.Tk):
         # Actions
         actions = ttk.Frame(outer)
         actions.pack(fill="x", pady=8)
-        self.submit_btn = ttk.Button(actions, text="Generate next round", command=self._generate_next_round, state="disabled")
+        self.submit_btn = ttk.Button(actions, text="Generate next round", command=self._generate_next_round,
+                                     state="disabled")
         self.submit_btn.pack(side="right")
 
     def _clear_pairings_rows(self):
@@ -287,7 +395,6 @@ class TournamentApp(tk.Tk):
         else:
             # disable the submit button
             self.submit_btn.configure(state="disabled")
-
 
     def _goto_prev_round(self):
         if not self.tournament or self.view_round is None:

@@ -1,4 +1,6 @@
+import json
 import logging
+import pickle
 
 import numpy as np
 import pandas as pd
@@ -9,19 +11,46 @@ from dominion_swiss_tournament.graph_utils import build_player_graph, compute_pa
 from dominion_swiss_tournament.player import Player
 
 
+def create_from_data(path: str) -> "Tournament":
+    assert path.endswith(".pickle")
+    with open(path, "rb") as f:
+        data = pickle.load(f)
+        tournament = Tournament(num_tables=len(data["tables"]))
+        tournament.pairings = data["pairings"]
+        tournament.players = data["players"]
+        tournament.tables = data["tables"]
+        tournament.current_round = data["current_round"]
+        tournament.recompute_leaderboard()
+    return tournament
+
+
 class Tournament:
-    def __init__(self, num_tables):
+    def __init__(self, num_tables, save_path: str):
         self.players = {}
         self.current_round = 0
         self.tables = [i + 1 for i in range(num_tables)]
         self.pairings = pd.DataFrame(columns=["round", "table", "player1", "player2", "score1", "score2"])
         self.leaderboard = None
         self.recompute_leaderboard()
+        self.save_path = save_path
+
+    def export(self):
+        to_save = {
+            "pairings": self.pairings,
+            "players": self.players,
+            "tables": self.tables,
+            "current_round": self.current_round
+        }
+        assert self.save_path.endswith(".pkl"), "Path must end with .pkl"
+        with open(self.save_path, "wb") as f:
+            pickle.dump(to_save, f)
+        logging.info(f"Saved current tournament data to {self.save_path}")
 
     def add_players(self, players: list[str]):
         # check that there are enough tables
         if len(self.tables) < (len(players) + len(self.players)) // 2:
-            raise ValueError(f"Not enough tables for this amount of players: {len(self.tables)} tables for {(len(players) + len(self.players))} players")
+            raise ValueError(
+                f"Not enough tables for this amount of players: {len(self.tables)} tables for {(len(players) + len(self.players))} players")
         for player in players:
             # generate a unique player ID
             player_id = len(self.players) + 1
@@ -29,14 +58,14 @@ class Tournament:
             self.players[player_id] = player_obj
         logging.info(f"Added {len(players)} players to the tournament.")
 
-
     def generate_new_round(self) -> pd.DataFrame:
         if len(self.players) % 2 == 1:
             # one player has to receive a bye
             bye_player_id = compute_bye_player(self.players, self.pairings)
             current_round_players = {key: value for key, value in self.players.items() if key != bye_player_id}
             # use -1 for a NaN player to keep the col as full integers, same for tables
-            new_row = {"player1": bye_player_id, "player2": -1, "score1": 1, "score2": 0, "round": self.current_round + 1,
+            new_row = {"player1": bye_player_id, "player2": -1, "score1": 1, "score2": 0,
+                       "round": self.current_round + 1,
                        "table": -1}
             logging.info(f"Player {self.players[bye_player_id]} received a bye.")
         else:
@@ -80,7 +109,6 @@ class Tournament:
         current_pairings = self.pairings[self.pairings["round"] == self.current_round]
         return not (current_pairings["score1"].isnull().any() or current_pairings["score2"].isnull().any())
 
-
     def close_round(self) -> bool:
         # check if all pairings have scores
         if not self.all_pairings_submitted():
@@ -114,7 +142,8 @@ class Tournament:
 
                 # Games strictly within the group
                 intra = pairings[
-                    (pairings["player1"].isin(player_ids)) & (pairings["player2"].isin(player_ids)) & (~pairings["score1"].isnull())
+                    (pairings["player1"].isin(player_ids)) & (pairings["player2"].isin(player_ids)) & (
+                        ~pairings["score1"].isnull())
                     ].copy()
 
                 expected_games = comb(n, 2)
@@ -192,13 +221,15 @@ class Tournament:
 
             return leaderboard
 
-        self.leaderboard = {"player_id": [], "player_name": [], "score": [], "buchholz_score_cut1": [], "buchholz_score": []}
+        self.leaderboard = {"player_id": [], "player_name": [], "score": [], "buchholz_score_cut1": [],
+                            "buchholz_score": []}
         for player_id, player in self.players.items():
             self.leaderboard["player_id"].append(player_id)
             self.leaderboard["player_name"].append(player.player_name)
             self.leaderboard["score"].append(player.score(self.pairings))
             self.leaderboard["buchholz_score"].append(player.buchholz_score(self.pairings, self.players, mode="normal"))
-            self.leaderboard["buchholz_score_cut1"].append(player.buchholz_score(self.pairings, self.players, mode="cut1"))
+            self.leaderboard["buchholz_score_cut1"].append(
+                player.buchholz_score(self.pairings, self.players, mode="cut1"))
         self.leaderboard = pd.DataFrame(self.leaderboard)
         # get direct encounters:
         self.leaderboard = add_direct_encounter_score(self.leaderboard, self.pairings)
@@ -210,12 +241,13 @@ class Tournament:
         self.leaderboard = (
             self.leaderboard
             .sort_values(
-                by=["score", "buchholz_score_cut1", "buchholz_score", "direct_encounter_score", "number_of_wins", "number_of_wins_as_player2", "number_of_games_as_player2"],
+                by=["score", "buchholz_score_cut1", "buchholz_score", "direct_encounter_score", "number_of_wins",
+                    "number_of_wins_as_player2", "number_of_games_as_player2"],
                 ascending=[False] * 7,  # all descending
                 inplace=False
             )
             .reset_index(drop=True)
-        )        # add rank column starting with 1
+        )  # add rank column starting with 1
         self.leaderboard["rank"] = self.leaderboard.index + 1
         logging.info("Recomputed leaderboard.")
         logging.debug(self.leaderboard.to_string())
