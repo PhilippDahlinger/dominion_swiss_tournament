@@ -1,6 +1,8 @@
 # gui.py
 import functools
 import logging
+import os
+from platformdirs import user_data_dir
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -10,7 +12,7 @@ import sv_ttk
 
 # Adjust these imports to match your project structure
 from dominion_swiss_tournament.player import Player
-from dominion_swiss_tournament.tournament import Tournament
+from dominion_swiss_tournament.tournament import Tournament, create_from_data
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 
@@ -61,6 +63,14 @@ class TournamentApp(tk.Tk):
         # sv_ttk theme (dark)
         sv_ttk.set_theme("dark")
 
+        # old save db
+        self.base_dir = user_data_dir("DominionSwissTournament")
+        logging.info("Using base directory: %s", self.base_dir)
+        self.old_save_db_path = os.path.join(self.base_dir, "save_database.csv")
+        if os.path.exists(self.old_save_db_path):
+            self.old_save_db = pd.read_csv(self.old_save_db_path)
+        else:
+            self.old_save_db = pd.DataFrame(columns=["tournament_display_name", "tournament_save_path"])
         # state
         self.tournament: Tournament | None = None
         self.result_widgets = []  # per pairing row widgets (metadata)
@@ -102,14 +112,33 @@ class TournamentApp(tk.Tk):
             messagebox.showerror("Validation", "Number of tables must be at least 1.")
             return
 
+        tournament_name = self.tournament_name_var.get().strip()
+        # create a path
+        if not tournament_name:
+            tournament_name = "Unnamed Tournament"
+        file_name = tournament_name.replace(" ", "_").lower()
+        # ignore invalid filename characters
+        file_name = "".join(c for c in file_name if c.isalnum() or c in ('_', '-')).rstrip()
+        file_name = file_name + ".pkl"
+        path = os.path.join(self.base_dir,  "saved_tournaments", file_name)
+        # create parent dir
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         # create Tournament and first round
-        self.tournament = Tournament(num_tables=num_tables)
+        self.tournament = Tournament(num_tables=num_tables, save_path=path)
+
         try:
             self.tournament.add_players(players)
         except ValueError:
             messagebox.showerror("Setup Error", "Not enough tables for the number of players.")
             self.tournament = None
             return
+
+        if not (self.old_save_db["tournament_display_name"] == tournament_name).any():
+            # add to database since the tournament was successfully created
+            self.old_save_db.loc[len(self.old_save_db)] = [tournament_name, path]
+            # save the updated database
+            self.old_save_db.to_csv(self.old_save_db_path, index=False)
+            logging.info("Updated save database at %s", self.old_save_db_path)
 
         # Generate round 1
         _ = self.tournament.generate_new_round()
@@ -156,11 +185,11 @@ class TournamentApp(tk.Tk):
         footer.pack(fill="x", pady=12)
 
         # Left: Load Tournament
-        load_btn = ttk.Button(footer, text="Load Tournament", command=self._open_load_dialog)
+        load_btn = ttk.Button(footer, text="Load Existing Tournament", command=self._open_load_dialog)
         load_btn.pack(side="left")  # bottom-left
 
         # Right: Start Tournament
-        start_btn = ttk.Button(footer, text="Start Tournament", command=self._start_tournament)
+        start_btn = ttk.Button(footer, text="Create New Tournament", command=self._start_tournament)
         start_btn.pack(side="right")  # bottom-right
 
     def _open_load_dialog(self):
@@ -242,7 +271,8 @@ class TournamentApp(tk.Tk):
         Replace this with your real storage (e.g., scan a directory, read a DB, etc.)
         Must return a list[str].
         """
-        return ["Spring Open 2024", "City Cup", "Friday Night #12", "Test Event"]
+        return list(self.old_save_db["tournament_display_name"])
+
 
     def _on_tournament_selected(self, name: str):
         """
@@ -250,9 +280,17 @@ class TournamentApp(tk.Tk):
         Do your loading logic here.
         """
         print("Selected tournament:", name)
-        # example: set the name field and load data
-        self.tournament_name_var.set(name)
-        # self._load_tournament_from_disk(name)
+        # get the path
+        load_path = self.old_save_db[self.old_save_db["tournament_display_name"] == name].reset_index(drop=True).loc[0, "tournament_save_path"]
+        print("stop")
+        self.tournament = create_from_data(load_path)
+        # Initialize view round to the current round
+        self.view_round = self.tournament.current_round
+        self._populate_pairings_view()
+        self._populate_leaderboard_view()
+
+        # switch to pairings tab
+        self.nb.select(self.pairings_tab)
 
     # ---------- Pairings tab ----------
     def _build_pairings_tab(self):

@@ -12,10 +12,10 @@ from dominion_swiss_tournament.player import Player
 
 
 def create_from_data(path: str) -> "Tournament":
-    assert path.endswith(".pickle")
+    assert path.endswith(".pkl")
     with open(path, "rb") as f:
         data = pickle.load(f)
-        tournament = Tournament(num_tables=len(data["tables"]))
+        tournament = Tournament(num_tables=len(data["tables"]), save_path=path)
         tournament.pairings = data["pairings"]
         tournament.players = data["players"]
         tournament.tables = data["tables"]
@@ -83,6 +83,8 @@ class Tournament:
         # update round
         self.current_round += 1
         logging.info(f"Created new round with {len(pairings)} pairings.")
+        # save current state
+        self.export()
         return pairings  # return new pairings
 
     def upload_result(self, table, score1, score2):
