@@ -78,6 +78,22 @@ class ScrollableFrame(ttk.Frame):
                 self.vsb.pack_forget()
 
 
+class AutoHideScrollbar(ttk.Scrollbar):
+    """A scrollbar that hides itself if not needed."""
+
+    def set(self, lo, hi):
+        if float(lo) <= 0.0 and float(hi) >= 1.0:
+            self.grid_remove()
+        else:
+            self.grid()
+        super().set(lo, hi)
+
+    def pack(self, **kw):
+        raise tk.TclError("Cannot use pack with AutoHideScrollbar")
+
+    def place(self, **kw):
+        raise tk.TclError("Cannot use place with AutoHideScrollbar")
+
 class TournamentApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -582,15 +598,37 @@ class TournamentApp(tk.Tk):
         else:
             messagebox.showinfo("Results", "Cannot close round: not all results are uploaded.")
 
-    # ---------- Leaderboard tab ----------
     def _build_leaderboard_tab(self):
         outer = ttk.Frame(self.leaderboard_tab, padding=12)
         outer.pack(fill="both", expand=True)
 
-        header = ttk.Label(outer, text="Leaderboard", font=("TkDefaultFont", 14, "bold"))
-        header.pack(anchor="w", pady=(0, 8))
+        # Header bar: Leaderboard title (left), Show Tiebreaks (right)
+        header_bar = ttk.Frame(outer)
+        header_bar.pack(fill="x", pady=(0, 8))
 
-        # Treeview setup (start with base columns)
+        title_text = "Leaderboard"
+        if self.tournament:
+            title_text += f" – Round {self.tournament.current_round}"
+
+        self.leader_header = ttk.Label(header_bar, text=title_text, font=("TkDefaultFont", 14, "bold"))
+        self.leader_header.pack(side="left")
+
+        self.show_tiebreaks_var = tk.BooleanVar(value=False)
+        cb = ttk.Checkbutton(
+            header_bar,
+            text="Show Tiebreaks",
+            variable=self.show_tiebreaks_var,
+            command=self._toggle_tiebreaks
+        )
+        cb.pack(side="right")
+
+        # Treeview with auto-hide vertical scrollbar
+        tv_frame = ttk.Frame(outer)
+        tv_frame.pack(fill="both", expand=True)
+
+        vsb = AutoHideScrollbar(tv_frame, orient="vertical")
+        vsb.grid(row=0, column=1, sticky="ns")
+
         self.base_cols = {"rank": "Rank", "player_name": "Player", "score": "Score"}
         self.tie_cols = {
             "buchholz_cut1": "Buchholz Cut 1",
@@ -599,31 +637,24 @@ class TournamentApp(tk.Tk):
             "num_wins": "Wins"
         }
 
-        self.show_tiebreaks_var = tk.BooleanVar(value=False)
-
         self.leader_tv = ttk.Treeview(
-            outer,
+            tv_frame,
             columns=list(self.base_cols.keys()),
             show="headings",
-            height=10
+            height=12,
+            yscrollcommand=vsb.set
         )
         self._setup_leaderboard_columns()
-        self.leader_tv.pack(fill="both", expand=True)
+        self.leader_tv.grid(row=0, column=0, sticky="nsew")
 
-        # Checkbox + buttons row
-        btns = ttk.Frame(outer)
-        btns.pack(fill="x", pady=8)
+        vsb.config(command=self.leader_tv.yview)
 
-        cb = ttk.Checkbutton(
-            btns,
-            text="Show Tiebreaks",
-            variable=self.show_tiebreaks_var,
-            command=self._toggle_tiebreaks
-        )
-        cb.pack(side="left")
+        tv_frame.grid_rowconfigure(0, weight=1)
+        tv_frame.grid_columnconfigure(0, weight=1)
 
-        refresh_btn = ttk.Button(btns, text="Refresh", command=self._populate_leaderboard_view)
-        refresh_btn.pack(side="right")
+        # Configure zebra striping
+        self.leader_tv.tag_configure("oddrow", background="#2a2a2a")
+        self.leader_tv.tag_configure("evenrow", background="#1e1e1e")
 
     def _setup_leaderboard_columns(self):
         """Configure Treeview columns depending on checkbox."""
@@ -637,8 +668,11 @@ class TournamentApp(tk.Tk):
             width = 150
             if c == "player_name":
                 width = 300
+                anchor = "w"  # left-align names
+            else:
+                anchor = "center"
             self.leader_tv.heading(c, text=display_name)
-            self.leader_tv.column(c, width=width, anchor="center")
+            self.leader_tv.column(c, width=width, anchor=anchor)
 
     def _toggle_tiebreaks(self):
         """Reconfigure columns and refresh view when checkbox changes."""
@@ -653,12 +687,13 @@ class TournamentApp(tk.Tk):
         if not self.tournament or self.tournament.leaderboard is None:
             return
 
-        # Use the leaderboard as provided by Tournament (no recomputation here)
+        # Update header text with current round
+        self.leader_header.config(text=f"Leaderboard – Round {self.tournament.current_round}")
+
         self.tournament.recompute_leaderboard()
         lb = self.tournament.leaderboard
 
-        # Expect columns: player_id, player_name, score, buchholz_cut1, buchholz, direct_encounter, num_wins, rank
-        for _, r in lb.iterrows():
+        for idx, (_, r) in enumerate(lb.iterrows()):
             values = [int(r["rank"]), r["player_name"], float(r["score"])]
             if self.show_tiebreaks_var.get():
                 values.extend([
@@ -667,7 +702,8 @@ class TournamentApp(tk.Tk):
                     float(r["direct_encounter_score"]),
                     int(r["number_of_wins"]),
                 ])
-            self.leader_tv.insert("", "end", values=values)
+            tag = "evenrow" if idx % 2 == 0 else "oddrow"
+            self.leader_tv.insert("", "end", values=values, tags=(tag,))
 
     # ---------- Tab switch handling ----------
     def _on_tab_changed(self, event):
