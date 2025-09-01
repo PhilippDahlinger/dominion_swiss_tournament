@@ -271,6 +271,8 @@ class TournamentApp(tk.Tk):
         Replace this with your real storage (e.g., scan a directory, read a DB, etc.)
         Must return a list[str].
         """
+        # check that the paths exist, otherwise filter them out
+        self.old_save_db = self.old_save_db[self.old_save_db["tournament_save_path"].apply(os.path.exists)].reset_index(drop=True)
         return list(self.old_save_db["tournament_display_name"])
 
 
@@ -312,7 +314,7 @@ class TournamentApp(tk.Tk):
 
         ttk.Separator(outer, orient="horizontal").pack(fill="x", pady=6)
 
-        # Scrollable area containing ONE grid for both header and rows (ensures perfect alignment)
+        # Scrollable area
         self.scroll = ScrollableFrame(outer)
         self.scroll.pack(fill="both", expand=True)
 
@@ -320,14 +322,31 @@ class TournamentApp(tk.Tk):
         self.table_grid.pack(fill="x", expand=True)
 
         # Shared grid column configuration
-        # (weights and minsize mirror both header "columns" and row cells)
         for col_idx, (w, minw) in enumerate([(1, 80), (3, 220), (3, 220), (2, 140)]):
             self.table_grid.grid_columnconfigure(col_idx, weight=w, uniform="paircols", minsize=minw)
 
         # Actions
         actions = ttk.Frame(outer)
         actions.pack(fill="x", pady=8)
-        self.submit_btn = ttk.Button(actions, text="Generate next round", command=self._generate_next_round,
+
+        # Style for red button
+        style = ttk.Style()
+        style.configure("Danger.TButton", foreground="white", background="#d9534f")
+        style.map("Danger.TButton",
+                  background=[("active", "#c9302c")])
+
+        self.delete_btn = ttk.Button(
+            actions,
+            text="Delete Last Round",
+            command=self._delete_last_round,
+            state="disabled"
+        )
+        self.delete_btn.pack(side="left")
+
+        # Right button: Generate next round
+        self.submit_btn = ttk.Button(actions, text="Generate next round",
+                                     command=self._generate_next_round,
+                                     style="Accent.TButton",
                                      state="disabled")
         self.submit_btn.pack(side="right")
 
@@ -363,7 +382,8 @@ class TournamentApp(tk.Tk):
         self.round_label.config(text=f"Round {self.view_round}")
         self.prev_btn.configure(state=("normal" if self.view_round > 1 else "disabled"))
         self.next_btn.configure(state=("normal" if self.view_round < self.tournament.current_round else "disabled"))
-        self.submit_btn.configure(state="disabled")
+        self._update_delete_button_state()
+        self._update_submit_button_state()
 
         self._build_pairings_header()
 
@@ -427,6 +447,9 @@ class TournamentApp(tk.Tk):
         # upload this value to the tournament database
         score1, score2 = RESULT_TO_SCORES[new_value]  # validate the result
         self.tournament.upload_result(table, score1, score2)
+        self._update_submit_button_state()
+
+    def _update_submit_button_state(self):
         if self.tournament.all_pairings_submitted():
             # enable the submit button
             self.submit_btn.configure(state="normal")
@@ -447,6 +470,33 @@ class TournamentApp(tk.Tk):
         if self.view_round < self.tournament.current_round:
             self.view_round += 1
             self._populate_pairings_view()
+
+    def _delete_last_round(self):
+        if self.tournament is None:
+            return
+
+        # Confirmation dialog
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            "Are you sure you want to delete the last round?",
+            icon="warning"
+        )
+        if not confirm:
+            return  # user canceled
+
+        if self.tournament.delete_last_round():
+            self.view_round = self.tournament.current_round
+            self._populate_pairings_view()
+        else:
+            messagebox.showinfo("Delete Round", "Cannot delete first round.")
+
+        self._update_delete_button_state()
+
+    def _update_delete_button_state(self):
+        if self.tournament.current_round > 1:
+            self.delete_btn.config(state="normal")
+        else:
+            self.delete_btn.config(state="disabled")
 
     def _generate_next_round(self):
         if self.tournament is None:
@@ -478,7 +528,7 @@ class TournamentApp(tk.Tk):
         outer = ttk.Frame(self.leaderboard_tab, padding=12)
         outer.pack(fill="both", expand=True)
 
-        header = ttk.Label(outer, text="Leaderboard (current)", font=("TkDefaultFont", 14, "bold"))
+        header = ttk.Label(outer, text="Leaderboard", font=("TkDefaultFont", 14, "bold"))
         header.pack(anchor="w", pady=(0, 8))
 
         cols = {"rank": "Rank", "player_name": "Player", "score": "Score"}

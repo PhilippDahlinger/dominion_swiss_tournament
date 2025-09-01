@@ -87,6 +87,16 @@ class Tournament:
         self.export()
         return pairings  # return new pairings
 
+    def delete_last_round(self) -> bool:
+        if self.current_round == 1:
+            logging.error("Cannot delete round 1.")
+            return False
+        # remove all pairings from the last round
+        self.pairings = self.pairings[self.pairings["round"] < self.current_round]
+        self.current_round -= 1
+        self.recompute_leaderboard()
+        return True
+
     def upload_result(self, table, score1, score2):
         # boolean mask for the match
         mask = (self.pairings["table"] == table) & (self.pairings["round"] == self.current_round)
