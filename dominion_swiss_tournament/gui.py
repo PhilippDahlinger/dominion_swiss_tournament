@@ -12,6 +12,7 @@ import sv_ttk
 
 # Adjust these imports to match your project structure
 from dominion_swiss_tournament.player import Player
+from dominion_swiss_tournament.tooltip import Tooltip
 from dominion_swiss_tournament.tournament import Tournament, create_from_data
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
@@ -439,13 +440,19 @@ class TournamentApp(tk.Tk):
 
             def name_for(pid):
                 if pid == -1:
-                    return "BYE"
+                    return "— (bye)"
                 return self.tournament.players.get(pid, Player(pid, f"#{pid}")).player_name
 
             ttk.Label(self.table_grid, text=("—" if table == -1 else str(table))).grid(row=r, column=0, sticky="w",
                                                                                        padx=(0, 6))
-            ttk.Label(self.table_grid, text=name_for(p1)).grid(row=r, column=1, sticky="w", padx=6)
-            ttk.Label(self.table_grid, text=name_for(p2)).grid(row=r, column=2, sticky="w", padx=6)
+            lbl_p1 = ttk.Label(self.table_grid, text=name_for(p1))
+            lbl_p1.grid(row=r, column=1, sticky="w", padx=6)
+            lbl_p2 = ttk.Label(self.table_grid, text=name_for(p2))
+            lbl_p2.grid(row=r, column=2, sticky="w", padx=6)
+
+            if p2 == -1:
+                Tooltip(lbl_p2, "This player has a BYE: no opponent this round, automatic win.")
+                Tooltip(lbl_p1, "This player has a BYE: no opponent this round, automatic win.")
 
             initial = _scores_to_result(s1, s2)
             cb_var = tk.StringVar(value=initial if initial in RESULT_OPTIONS else "N/A")
@@ -566,17 +573,60 @@ class TournamentApp(tk.Tk):
         header = ttk.Label(outer, text="Leaderboard", font=("TkDefaultFont", 14, "bold"))
         header.pack(anchor="w", pady=(0, 8))
 
-        cols = {"rank": "Rank", "player_name": "Player", "score": "Score"}
-        self.leader_tv = ttk.Treeview(outer, columns=list(cols.keys()), show="headings", height=20)
-        for c, display_name in cols.items():
-            self.leader_tv.heading(c, text=display_name)
-            self.leader_tv.column(c, width=150 if c != "player_name" else 300, anchor="center")
+        # Treeview setup (start with base columns)
+        self.base_cols = {"rank": "Rank", "player_name": "Player", "score": "Score"}
+        self.tie_cols = {
+            "buchholz_cut1": "Buchholz Cut 1",
+            "buchholz": "Buchholz",
+            "direct_encounter": "Direct Encounter",
+            "num_wins": "Wins"
+        }
+
+        self.show_tiebreaks_var = tk.BooleanVar(value=False)
+
+        self.leader_tv = ttk.Treeview(
+            outer,
+            columns=list(self.base_cols.keys()),
+            show="headings",
+            height=10
+        )
+        self._setup_leaderboard_columns()
         self.leader_tv.pack(fill="both", expand=True)
 
+        # Checkbox + buttons row
         btns = ttk.Frame(outer)
         btns.pack(fill="x", pady=8)
+
+        cb = ttk.Checkbutton(
+            btns,
+            text="Show Tiebreaks",
+            variable=self.show_tiebreaks_var,
+            command=self._toggle_tiebreaks
+        )
+        cb.pack(side="left")
+
         refresh_btn = ttk.Button(btns, text="Refresh", command=self._populate_leaderboard_view)
         refresh_btn.pack(side="right")
+
+    def _setup_leaderboard_columns(self):
+        """Configure Treeview columns depending on checkbox."""
+        cols = self.base_cols.copy()
+        if self.show_tiebreaks_var.get():
+            cols.update(self.tie_cols)
+
+        self.leader_tv.config(columns=list(cols.keys()))
+
+        for c, display_name in cols.items():
+            width = 150
+            if c == "player_name":
+                width = 300
+            self.leader_tv.heading(c, text=display_name)
+            self.leader_tv.column(c, width=width, anchor="center")
+
+    def _toggle_tiebreaks(self):
+        """Reconfigure columns and refresh view when checkbox changes."""
+        self._setup_leaderboard_columns()
+        self._populate_leaderboard_view()
 
     def _populate_leaderboard_view(self):
         # Clear
@@ -590,9 +640,17 @@ class TournamentApp(tk.Tk):
         self.tournament.recompute_leaderboard()
         lb = self.tournament.leaderboard
 
-        # Expect columns: player_id, player_name, score, buchholz_score, rank
+        # Expect columns: player_id, player_name, score, buchholz_cut1, buchholz, direct_encounter, num_wins, rank
         for _, r in lb.iterrows():
-            self.leader_tv.insert("", "end", values=(int(r["rank"]), r["player_name"], float(r["score"])))
+            values = [int(r["rank"]), r["player_name"], float(r["score"])]
+            if self.show_tiebreaks_var.get():
+                values.extend([
+                    float(r["buchholz_score_cut1"]),
+                    float(r["buchholz_score"]),
+                    float(r["direct_encounter_score"]),
+                    int(r["number_of_wins"]),
+                ])
+            self.leader_tv.insert("", "end", values=values)
 
     # ---------- Tab switch handling ----------
     def _on_tab_changed(self, event):
