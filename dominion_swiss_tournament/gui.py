@@ -116,6 +116,16 @@ class TournamentApp(tk.Tk):
         # create a path
         if not tournament_name:
             tournament_name = "Unnamed Tournament"
+        # check if the name already exists in the old save db
+        if (self.old_save_db["tournament_display_name"] == tournament_name).any():
+            # ask for confirmation to overwrite
+            overwrite = messagebox.askyesno(
+                "Confirm Overwrite",
+                f"A tournament named '{tournament_name}' already exists. Do you want to overwrite it?",
+                icon="warning"
+            )
+            if not overwrite:
+                return
         file_name = tournament_name.replace(" ", "_").lower()
         # ignore invalid filename characters
         file_name = "".join(c for c in file_name if c.isalnum() or c in ('_', '-')).rstrip()
@@ -155,29 +165,45 @@ class TournamentApp(tk.Tk):
         wrapper = ttk.Frame(self.setup_tab, padding=16)
         wrapper.pack(fill="both", expand=True)
 
-        header = ttk.Label(wrapper, text="Setup Tournament", font=("TkDefaultFont", 16, "bold"))
-        header.pack(anchor="w", pady=(0, 12))
+        # Header bar with title (left) and About link (right)
+        header_bar = ttk.Frame(wrapper)
+        header_bar.pack(fill="x", pady=(0, 12))
 
-        form = ttk.Frame(wrapper)
-        form.pack(fill="x", pady=8)
+        header = ttk.Label(header_bar, text="Setup Tournament", font=("TkDefaultFont", 16, "bold"))
+        header.pack(side="left")
 
-        # Tournament name
-        ttk.Label(form, text="Tournament name:").grid(row=0, column=0, sticky="w", padx=(0, 8))
+        about_lbl = ttk.Label(
+            header_bar,
+            text="About",
+            font=("TkDefaultFont", 10, "underline"),
+            foreground="#57c8ff",
+            cursor="hand2"
+        )
+        about_lbl.pack(side="right")
+        about_lbl.bind("<Button-1>", lambda e: self._show_about_dialog())
+
+        # Tournament settings in a labeled frame
+        settings_frame = ttk.Labelframe(wrapper, text="Tournament Settings", padding=10)
+        settings_frame.pack(fill="x", pady=8)
+
+        ttk.Label(settings_frame, text="Tournament name:").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=4)
         self.tournament_name_var = tk.StringVar()
-        self.tournament_name_entry = ttk.Entry(form, textvariable=self.tournament_name_var, width=32)
-        self.tournament_name_entry.grid(row=0, column=1, sticky="we", columnspan=2)
+        self.tournament_name_entry = ttk.Entry(settings_frame, textvariable=self.tournament_name_var, width=32)
+        self.tournament_name_entry.grid(row=0, column=1, sticky="we", columnspan=2, pady=4)
 
-        # Number of tables
-        ttk.Label(form, text="Number of tables:").grid(row=1, column=0, sticky="w", padx=(0, 8))
+        ttk.Label(settings_frame, text="Number of tables:").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=4)
         self.tables_var = tk.IntVar(value=8)
-        self.tables_spin = ttk.Spinbox(form, from_=1, to=200, textvariable=self.tables_var, width=8)
-        self.tables_spin.grid(row=1, column=1, sticky="w")
+        self.tables_spin = ttk.Spinbox(settings_frame, from_=1, to=200, textvariable=self.tables_var, width=8)
+        self.tables_spin.grid(row=1, column=1, sticky="w", pady=4)
 
-        form.columnconfigure(1, weight=1)
+        settings_frame.columnconfigure(1, weight=1)
 
-        # Players input
-        ttk.Label(wrapper, text="Players (one per line):").pack(anchor="w", pady=(12, 4))
-        self.players_text = tk.Text(wrapper, height=16)
+        # Players input in its own labeled frame
+        players_frame = ttk.Labelframe(wrapper, text="Players", padding=10)
+        players_frame.pack(fill="both", expand=True, pady=(12, 8))
+
+        ttk.Label(players_frame, text="Enter one player name per line:").pack(anchor="w", pady=(0, 4))
+        self.players_text = tk.Text(players_frame, height=4)
         self.players_text.pack(fill="both", expand=True)
 
         # Footer with left + right buttons
@@ -188,9 +214,18 @@ class TournamentApp(tk.Tk):
         load_btn = ttk.Button(footer, text="Load Existing Tournament", command=self._open_load_dialog)
         load_btn.pack(side="left")  # bottom-left
 
-        # Right: Start Tournament
         start_btn = ttk.Button(footer, text="Create New Tournament", command=self._start_tournament)
         start_btn.pack(side="right")  # bottom-right
+
+    def _show_about_dialog(self):
+        """Popup dialog for About information."""
+        messagebox.showinfo(
+            "About Dominion Swiss Tournament",
+            "Dominion Swiss Tournament Manager\n\n"
+            "Version 1.0 (2025)\n"
+            "Created by Your Name\n\n"
+            "This tool helps manage Dominion tournaments using the Swiss pairing system."
+        )
 
     def _open_load_dialog(self):
         # parent window
@@ -337,7 +372,7 @@ class TournamentApp(tk.Tk):
 
         self.delete_btn = ttk.Button(
             actions,
-            text="Delete Last Round",
+            text="Delete Current Round",
             command=self._delete_last_round,
             state="disabled"
         )
@@ -478,7 +513,7 @@ class TournamentApp(tk.Tk):
         # Confirmation dialog
         confirm = messagebox.askyesno(
             "Confirm Delete",
-            "Are you sure you want to delete the last round?",
+            f"Are you sure you want to delete round {self.tournament.current_round}?",
             icon="warning"
         )
         if not confirm:
