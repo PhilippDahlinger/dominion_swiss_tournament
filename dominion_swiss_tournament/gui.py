@@ -246,8 +246,27 @@ class TournamentApp(tk.Tk):
         players_frame.pack(fill="both", expand=True, pady=(12, 8))
 
         ttk.Label(players_frame, text="Enter one player name per line:").pack(anchor="w", pady=(0, 4))
-        self.players_text = tk.Text(players_frame, height=4)
-        self.players_text.pack(fill="both", expand=True)
+
+        # Frame to hold Text + scrollbar
+        text_frame = ttk.Frame(players_frame)
+        text_frame.pack(fill="both", expand=True)
+
+        vsb = AutoHideScrollbar(text_frame, orient="vertical")
+        vsb.grid(row=0, column=1, sticky="ns")
+
+        self.players_text = tk.Text(
+            text_frame,
+            height=4,
+            wrap="none",  # optional: avoid line wrapping
+            yscrollcommand=vsb.set
+        )
+        self.players_text.grid(row=0, column=0, sticky="nsew")
+
+        vsb.config(command=self.players_text.yview)
+
+        # Make the text expand when resizing
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
 
         # Footer with left + right buttons
         footer = ttk.Frame(wrapper)
