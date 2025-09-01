@@ -2,6 +2,8 @@
 import functools
 import logging
 import os
+import webbrowser
+
 from platformdirs import user_data_dir
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -94,6 +96,7 @@ class AutoHideScrollbar(ttk.Scrollbar):
     def place(self, **kw):
         raise tk.TclError("Cannot use place with AutoHideScrollbar")
 
+
 class TournamentApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -170,7 +173,7 @@ class TournamentApp(tk.Tk):
         # ignore invalid filename characters
         file_name = "".join(c for c in file_name if c.isalnum() or c in ('_', '-')).rstrip()
         file_name = file_name + ".pkl"
-        path = os.path.join(self.base_dir,  "saved_tournaments", file_name)
+        path = os.path.join(self.base_dir, "saved_tournaments", file_name)
         # create parent dir
         os.makedirs(os.path.dirname(path), exist_ok=True)
         # create Tournament and first round
@@ -257,15 +260,71 @@ class TournamentApp(tk.Tk):
         start_btn = ttk.Button(footer, text="Create New Tournament", command=self._start_tournament)
         start_btn.pack(side="right")  # bottom-right
 
+    import webbrowser
+    import tkinter as tk
+    from tkinter import ttk
+
     def _show_about_dialog(self):
-        """Popup dialog for About information."""
-        messagebox.showinfo(
-            "About Dominion Swiss Tournament",
-            "Dominion Swiss Tournament Manager\n\n"
-            "Version 1.0 (2025)\n"
-            "Created by Your Name\n\n"
-            "This tool helps manage Dominion tournaments using the Swiss pairing system."
+        win = tk.Toplevel(self)
+        win.title("About Dominion Swiss Tournament")
+        win.resizable(False, False)
+        win.transient(self)  # stay on top of parent
+
+        frm = ttk.Frame(win, padding=16)
+        frm.pack(fill="both", expand=True)
+
+        ttk.Label(frm, text="Dominion Swiss Tournament Manager",
+                  font=("TkDefaultFont", 14, "bold")).pack(anchor="w")
+
+        ttk.Label(frm, text="Version 1.0 (2025)\nCreated by Philipp Dahlinger",
+                  font=("TkDefaultFont", 12)).pack(anchor="w", pady=(6, 12))
+
+        ttk.Label(frm,
+                  text=("This tool helps organize Dominion tournaments using the Swiss pairing system, "
+                        "ensuring that no player is assigned to the same table more than once."),
+                  font=("TkDefaultFont", 10),
+                  wraplength=380,
+                  justify="left").pack(anchor="w", pady=(0, 12))
+
+        # GitHub link with tooltip
+        github_url = "https://github.com/PhilippDahlinger/dominion_swiss_tournament"
+        link = ttk.Label(
+            frm,
+            text="View on GitHub",
+            font=("TkDefaultFont", 10, "underline"),
+            foreground="#57c8ff",
+            cursor="hand2"
         )
+        link.pack(anchor="w")
+        link.bind("<Button-1>", lambda e: webbrowser.open(github_url))
+        Tooltip(link, "github.com/PhilippDahlinger/dominion_swiss_tournament")
+
+        # License note
+        ttk.Label(frm,
+                  text="Open Source – Licensed under the MIT License\nSee GitHub for full details.",
+                  font=("TkDefaultFont", 9),
+                  foreground="#888",
+                  justify="left").pack(anchor="w", pady=(12, 0))
+
+        ttk.Button(frm, text="OK", command=win.destroy).pack(pady=(12, 0))
+
+        # Center on parent
+        win.update_idletasks()
+        px = self.winfo_rootx()
+        py = self.winfo_rooty()
+        pw = self.winfo_width()
+        ph = self.winfo_height()
+        ww = win.winfo_width()
+        wh = win.winfo_height()
+        x = px + (pw - ww) // 2
+        y = py + (ph - wh) // 2
+        win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+
+        # Modal behavior
+        win.wait_visibility()
+        win.grab_set()
+        win.focus_set()
+        win.wait_window()
 
     def _open_load_dialog(self):
         # parent window
@@ -347,9 +406,9 @@ class TournamentApp(tk.Tk):
         Must return a list[str].
         """
         # check that the paths exist, otherwise filter them out
-        self.old_save_db = self.old_save_db[self.old_save_db["tournament_save_path"].apply(os.path.exists)].reset_index(drop=True)
+        self.old_save_db = self.old_save_db[self.old_save_db["tournament_save_path"].apply(os.path.exists)].reset_index(
+            drop=True)
         return list(self.old_save_db["tournament_display_name"])
-
 
     def _on_tournament_selected(self, name: str):
         """
@@ -358,7 +417,8 @@ class TournamentApp(tk.Tk):
         """
         print("Selected tournament:", name)
         # get the path
-        load_path = self.old_save_db[self.old_save_db["tournament_display_name"] == name].reset_index(drop=True).loc[0, "tournament_save_path"]
+        load_path = self.old_save_db[self.old_save_db["tournament_display_name"] == name].reset_index(drop=True).loc[
+            0, "tournament_save_path"]
         print("stop")
         self.tournament = create_from_data(load_path)
         # Initialize view round to the current round
