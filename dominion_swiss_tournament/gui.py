@@ -44,15 +44,38 @@ class ScrollableFrame(ttk.Frame):
         self.vsb = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
         self.inner = ttk.Frame(self.canvas)
 
-        self.inner.bind(
-            "<Configure>",
-            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-        )
-        self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
+        self.inner.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
+
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
         self.canvas.configure(yscrollcommand=self.vsb.set)
 
         self.canvas.pack(side="left", fill="both", expand=True)
-        self.vsb.pack(side="right", fill="y")
+        # Do not pack scrollbar here; it will be packed/unpacked dynamically
+
+    def _on_frame_configure(self, event):
+        # Update scrollregion
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        self._update_scrollbar()
+
+    def _on_canvas_configure(self, event):
+        # Re-check whenever the canvas itself resizes
+        self._update_scrollbar()
+
+    def _update_scrollbar(self):
+        # bbox returns (x1, y1, x2, y2)
+        bbox = self.canvas.bbox("all")
+        if not bbox:
+            return
+        content_height = bbox[3] - bbox[1]
+        visible_height = self.canvas.winfo_height()
+
+        if content_height > visible_height:
+            if not self.vsb.winfo_ismapped():
+                self.vsb.pack(side="right", fill="y")
+        else:
+            if self.vsb.winfo_ismapped():
+                self.vsb.pack_forget()
 
 
 class TournamentApp(tk.Tk):
@@ -364,12 +387,6 @@ class TournamentApp(tk.Tk):
         # Actions
         actions = ttk.Frame(outer)
         actions.pack(fill="x", pady=8)
-
-        # Style for red button
-        style = ttk.Style()
-        style.configure("Danger.TButton", foreground="white", background="#d9534f")
-        style.map("Danger.TButton",
-                  background=[("active", "#c9302c")])
 
         self.delete_btn = ttk.Button(
             actions,
