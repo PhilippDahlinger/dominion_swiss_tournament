@@ -102,6 +102,8 @@ class TournamentApp(tk.Tk):
         super().__init__()
         self.title("Dominion Swiss Tournament")
         self.geometry("1000x650")
+        # set minimum size
+        self.minsize(750, 500)
 
         # sv_ttk theme (dark)
         sv_ttk.set_theme("dark")
@@ -434,13 +436,17 @@ class TournamentApp(tk.Tk):
         This gets the SELECTED STRING from the dialog.
         Do your loading logic here.
         """
-        print("Selected tournament:", name)
         # get the path
         load_path = self.old_save_db[self.old_save_db["tournament_display_name"] == name].reset_index(drop=True).loc[
             0, "tournament_save_path"]
         print("stop")
         self.tournament = create_from_data(load_path)
         # Initialize view round to the current round
+        # set in the setub tab the name of the tournament
+        self.tournament_name_var.set(name)
+        # also the player names
+        self.players_text.delete("1.0", "end")
+        self.players_text.insert("1.0", "\n".join(p.player_name for p in self.tournament.players.values()))
         self.view_round = self.tournament.current_round
         self._populate_pairings_view()
         self._populate_leaderboard_view()

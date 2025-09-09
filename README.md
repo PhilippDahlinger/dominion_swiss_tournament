@@ -1,6 +1,6 @@
 
 ## Support
-If you find this project helpful, consider supporting its development by buying me a mate!
+If you find this project helpful, consider supporting its development by buying me a Club Mate!
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/X8X81KO3V1)
 
