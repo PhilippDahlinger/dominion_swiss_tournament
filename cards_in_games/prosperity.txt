@@ -1,0 +1,16 @@
+Bank
+Bishop
+City
+Expand
+Forge
+Grand Market
+Hoard
+King's Court
+Mint
+Monument
+Peddler
+Quarry
+Rabble
+Vault
+Watchtower
+Workers Village

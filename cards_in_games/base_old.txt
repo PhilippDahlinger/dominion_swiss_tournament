@@ -1,0 +1,20 @@
+Bureaucrat
+Cellar
+Chapel
+Council Room
+Festival
+Gardens
+Laboratory
+Library
+Market
+Militia
+Mine
+Moat
+Moneylender
+Remodel
+Smithy
+Throne Room
+Village
+Witch
+Workshop
+

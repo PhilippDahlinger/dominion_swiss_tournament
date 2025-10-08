@@ -1,0 +1,27 @@
+Bazaar
+Caravan
+Cutpurse
+Fishing Village
+Haven
+Island
+Lighthouse
+Lookout
+Merchant Ship
+Native Village
+Outpost
+Salvager
+Smugglers
+Tactician
+Treasure Map
+Treasury
+Warehouse
+Wharf
+Astrolabe
+Blockade
+Corsair
+Monkey
+Pirate
+Sailor
+Sea Chart
+Sea Witch
+Tide Pools

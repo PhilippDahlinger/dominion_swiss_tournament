@@ -1,0 +1,7 @@
+Artisan
+Bandit
+Harbinger
+Merchant
+Poacher
+Sentry
+Vassal
