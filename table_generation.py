@@ -12,14 +12,20 @@ available_games = {
 }
 
 sea_basic_table = {
-    "base_new": 2,
+    "base_new": 1,
     "base_old": 6,
-    "seaside": 2,
+    "seaside": 3,
 }
 
 intrigue_basic_table = {
-    "base_new": 2,
+    "base_new": 1,
     "base_old": 6,
+    "intrigue": 3,
+}
+
+intrigue_less_new_table = {
+    "base_new": 1,
+    "base_old": 7,
     "intrigue": 2,
 }
 
@@ -40,7 +46,10 @@ tables = [
     sea_basic_table,
     intrigue_basic_table,
     intrigue_basic_table,
-    finals_table,
+    sea_basic_table,
+    intrigue_basic_table,
+    # intrigue_basic_table,
+    # finals_table,
 ]
 
 
@@ -113,11 +122,21 @@ def generate_tables(tables, available_cards):
 
 if __name__ == "__main__":
     all_cards = load_cards()
-    available_cards = prepare_expansions(all_cards, available_games)
-    game_tables = generate_tables(tables, available_cards)
+    num_trials = 10
+    while num_trials > 0:
+        try:
+            available_cards = prepare_expansions(all_cards, available_games)
+            game_tables = generate_tables(tables, available_cards)
+        except ValueError as e:
+            print(f"Error: {e}. Retrying...")
+            num_trials -= 1
+            continue
+        break
+
 
     # print results
     for tid, cards in game_tables.items():
-        print(f"\n=== TABLE {tid} ===")
+        print(f"\n=== TABLE {tid+1} ===")
         for c in cards:
             print(c)
+
