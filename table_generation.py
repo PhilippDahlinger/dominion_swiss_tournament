@@ -1,7 +1,6 @@
 import os
 import random
 
-NUM_TABLES = 8
 
 available_games = {
     "base_old": 7,
@@ -18,8 +17,8 @@ sea_basic_table = {
 }
 
 intrigue_basic_table = {
-    "base_new": 1,
-    "base_old": 6,
+    "base_new": 2,
+    "base_old": 5,
     "intrigue": 3,
 }
 
@@ -38,18 +37,18 @@ finals_table = {
 }
 
 tables = [
-    sea_basic_table,
-    sea_basic_table,
-    intrigue_basic_table,
-    intrigue_basic_table,
-    sea_basic_table,
-    sea_basic_table,
-    intrigue_basic_table,
-    intrigue_basic_table,
-    sea_basic_table,
-    intrigue_basic_table,
+    # sea_basic_table,
+    # sea_basic_table,
     # intrigue_basic_table,
-    # finals_table,
+    # intrigue_basic_table,
+    # sea_basic_table,
+    # sea_basic_table,
+    # intrigue_basic_table,
+    # intrigue_basic_table,
+    # sea_basic_table,
+    # intrigue_basic_table,
+    # intrigue_basic_table,
+    finals_table,
 ]
 
 

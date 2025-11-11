@@ -1,0 +1,109 @@
+=== TABLE 1 ===
+Sentry
+Throne Room
+Bureaucrat
+Gardens
+Chapel
+Remodel
+Village
+Tide Pools
+Native Village
+Salvager
+
+=== TABLE 2 ===
+Artisan
+Gardens
+Remodel
+Smithy
+Moat
+Moneylender
+Chapel
+Treasury
+Fishing Village
+Haven
+
+=== TABLE 3 ===
+Harbinger
+Artisan
+Remodel
+Throne Room
+Militia
+Moneylender
+Market
+Baron
+Masquerade
+Duke
+
+=== TABLE 4 ===
+Merchant
+Harbinger
+Market
+Festival
+Moat
+Library
+Workshop
+Nobles
+Torturer
+Trading Post
+
+=== TABLE 5 ===
+Merchant
+Smithy
+Library
+Bureaucrat
+Chapel
+Workshop
+Market
+Corsair
+Treasure Map
+Smugglers
+
+=== TABLE 6 ===
+Vassal
+Chapel
+Workshop
+Market
+Village
+Gardens
+Remodel
+Astrolabe
+Wharf
+Lighthouse
+
+=== TABLE 7 ===
+Bandit
+Sentry
+Remodel
+Mine
+Village
+Festival
+Moat
+Mining Village
+Upgrade
+Trading Post
+
+=== TABLE 8 ===
+Bandit
+Poacher
+Workshop
+Village
+Bureaucrat
+Laboratory
+Gardens
+Minion
+Wishing Well
+Conspirator
+
+
+
+=== Finals TABLE ===
+Sentry
+Vassal
+Harem
+Blockade
+Sea Chart
+Smugglers
+Quarry
+King's Court
+Grand Market
+Vault
